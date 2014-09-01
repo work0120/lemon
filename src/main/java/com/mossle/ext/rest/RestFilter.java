@@ -9,6 +9,7 @@ import java.lang.reflect.Method;
 import java.net.URLDecoder;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,7 @@ import javax.ws.rs.core.MediaType;
 
 import com.mossle.core.mapper.JsonMapper;
 import com.mossle.core.spring.ApplicationContextHelper;
+import com.mossle.core.spring.DateConverter;
 import com.mossle.core.util.IoUtils;
 
 import org.slf4j.Logger;
@@ -44,6 +46,7 @@ import org.springframework.context.ApplicationContext;
 public class RestFilter implements Filter {
     private static Logger logger = LoggerFactory.getLogger(RestFilter.class);
     private JsonMapper jsonMapper = new JsonMapper();
+    private DateConverter dateConverter = new DateConverter();
 
     public void init(FilterConfig filterConfig) throws ServletException {
     }
@@ -91,13 +94,9 @@ public class RestFilter implements Filter {
                 continue;
             }
 
-            String[] array = text.split("=");
-            String key = array[0];
-            String value = "";
-
-            if (array.length == 2) {
-                value = array[1];
-            }
+            int index = text.indexOf("=");
+            String key = text.substring(0, index);
+            String value = text.substring(index + 1);
 
             parameters.put(key, value);
         }
@@ -148,6 +147,11 @@ public class RestFilter implements Filter {
                         } else if ((parameterTypeArray[i] == Integer.class)
                                 || (parameterTypeArray[i] == int.class)) {
                             arguments.add(Integer.parseInt(value));
+                        } else if ((parameterTypeArray[i] == Long.class)
+                                || (parameterTypeArray[i] == long.class)) {
+                            arguments.add(Long.parseLong(value));
+                        } else if (parameterTypeArray[i] == Date.class) {
+                            arguments.add(dateConverter.convert(value));
                         }
                     } else {
                         if (parameterTypeArray[i] == String.class) {

@@ -1,7 +1,10 @@
 package com.mossle.form.operation;
 
+import java.io.IOException;
+
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +55,39 @@ public class StartProcessOperation extends AbstractOperation<Void> {
     public static final int STATUS_RUNNING = 2;
     private JsonMapper jsonMapper = new JsonMapper();
 
+    public Map<String, String> fetchFormTypeMap(String content) {
+        logger.debug("content : {}", content);
+
+        try {
+            Map map = jsonMapper.fromJson(content, Map.class);
+            logger.debug("map : {}", map);
+
+            List<Map> sections = (List<Map>) map.get("sections");
+            logger.debug("sections : {}", sections);
+
+            Map<String, String> formTypeMap = new HashMap<String, String>();
+
+            for (Map section : sections) {
+                if (!"grid".equals(section.get("type"))) {
+                    continue;
+                }
+
+                List<Map> fields = (List<Map>) section.get("fields");
+
+                for (Map field : fields) {
+                    formTypeMap.put((String) field.get("name"),
+                            (String) field.get("type"));
+                }
+            }
+
+            return formTypeMap;
+        } catch (IOException ex) {
+            logger.error(ex.getMessage(), ex);
+
+            return Collections.emptyMap();
+        }
+    }
+
     public Void execute(CommandContext commandContext) {
         ProcessEngine processEngine = getProcessEngine();
         FormTemplateManager formTemplateManager = getFormTemplateManager();
@@ -79,22 +115,11 @@ public class StartProcessOperation extends AbstractOperation<Void> {
         Map<String, String> formTypeMap = new HashMap<String, String>();
 
         if (formInfo.isFormExists()) {
-            FormTemplate formTemplate = formTemplateManager.get(Long
-                    .parseLong(formInfo.getFormKey()));
+            FormTemplate formTemplate = formTemplateManager.findUniqueBy(
+                    "code", formInfo.getFormKey());
 
             String content = formTemplate.getContent();
-            logger.debug("content : {}", content);
-
-            Map map = jsonMapper.fromJson(content, Map.class);
-            logger.debug("map : {}", map);
-
-            List<Map> list = (List<Map>) map.get("fields");
-            logger.debug("list : {}", list);
-
-            for (Map item : list) {
-                formTypeMap.put((String) item.get("name"),
-                        (String) item.get("type"));
-            }
+            formTypeMap = this.fetchFormTypeMap(content);
         }
 
         Record record = keyValue.findByCode(businessKey);
@@ -107,7 +132,7 @@ public class StartProcessOperation extends AbstractOperation<Void> {
             String value = prop.getValue();
             String formType = this.getFormType(formTypeMap, key);
 
-            if ("userPicker".equals(formType)) {
+            if ("userpicker".equals(formType)) {
                 processParameters.put(key,
                         new ArrayList(Arrays.asList(value.split(","))));
             } else if (formType != null) {
